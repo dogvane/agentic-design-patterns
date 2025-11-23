@@ -307,16 +307,58 @@
       {{ content }}
 
       {%- if page.path contains 'original/' -%}
-        {%- assign pages = site.pages | where_exp: "item", "item.path contains 'original/'" | sort: "path" -%}
+        {%- assign pages = site.pages | where_exp: "item", "item.path contains 'original/'" -%}
       {%- else -%}
-        {%- assign pages = site.pages | where_exp: "item", "item.path contains 'chapters/'" | sort: "path" -%}
+        {%- assign pages = site.pages | where_exp: "item", "item.path contains 'chapters/'" -%}
       {%- endif -%}
-      {%- for page_item in pages -%}
+
+      {%- comment -%}
+        Build numeric-sorted chapter list without plugins:
+        - extract number from path like "Chapter 4_ ..." using split + last + split
+        - zero-pad single-digit numbers to ensure proper lexical sort
+        - create entries "NN||<url>", sort them, then map back to page objects
+      {%- endcomment -%}
+
+      {%- assign chapter_entries = "" | split: "" -%}
+      {%- assign other_pages = "" | split: "" -%}
+
+      {%- for p in pages -%}
+        {%- if p.path contains 'Chapter' -%}
+          {%- assign num_str = p.path | split: 'Chapter ' | last | split: '_' | first | strip -%}
+          {%- assign num = num_str | plus: 0 -%}
+          {%- if num < 10 -%}
+            {%- assign padded = '0' | append: num -%}
+          {%- else -%}
+            {%- assign padded = num | append: '' -%}
+          {%- endif -%}
+          {%- assign entry = padded | append: '||' | append: p.url -%}
+          {%- assign chapter_entries = chapter_entries | push: entry -%}
+        {%- else -%}
+          {%- assign other_pages = other_pages | push: p -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- assign sorted_entries = chapter_entries | sort -%}
+      {%- assign sorted_chapters = "" | split: "" -%}
+      {%- for e in sorted_entries -%}
+        {%- assign parts = e | split: '||' -%}
+        {%- assign url = parts[1] -%}
+        {%- assign matched = pages | where: "url", url -%}
+        {%- if matched.size > 0 -%}
+          {%- assign sorted_chapters = sorted_chapters | push: matched[0] -%}
+        {%- endif -%}
+      {%- endfor -%}
+
+      {%- assign sorted_pages = other_pages | concat: sorted_chapters -%}
+
+      {%- for page_item in sorted_pages -%}
         {%- if page_item.url == page.url -%}
           {%- assign current_index = forloop.index0 -%}
         {%- endif -%}
       {%- endfor -%}
+      {%- assign pages = sorted_pages -%}
 
+      
       {%- assign prev_index = current_index | minus: 1 -%}
       {%- assign next_index = current_index | plus: 1 -%}
 
